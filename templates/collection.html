@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Collection 📁</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+
+  <nav>
+    <a class="logo" href="/">🐝 StudyHive</a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/todo">📝 To-Do</a>
+      <a href="/library">📚 Library</a>
+      <a href="/collection" class="active">📁 My Collection</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>📁 <span class="highlight">My Collection</span></h1>
+    <p class="subtitle">Your personal study vault — notes, PDFs and flashcards!</p>
+  </div>
+
+  <div id="collection-container" style="margin-top:20px"></div>
+
+</div>
+
+<script>
+async function loadCollection() {
+  const response = await fetch('/get-collection');
+  const items = await response.json();
+  const container = document.getElementById('collection-container');
+
+  if (items.length === 0) {
+    container.innerHTML = '<p style="color:white; text-align:center; margin-top:20px">No items saved yet! Generate flashcards and save them 🐝</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'library-card';
+    div.innerHTML = `
+      <div class="library-card-header">
+        <h3>${item.title}</h3>
+        <span class="subject-tag">${item.subject}</span>
+      </div>
+      <p style="color:rgba(255,255,255,0.5); font-size:13px; margin-bottom:8px">📅 ${item.date} · 🃏 ${item.cards.length} flashcards</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
+        <button onclick="studyCollection(${i})" style="background:#a855f7; color:white; padding:8px 16px; border-radius:10px; border:none; cursor:pointer">Study 📖</button>
+        ${item.pdf_filename ? `<a href="/download-pdf/${item.pdf_filename}" style="background:linear-gradient(135deg,#ff6eb4,#a855f7); color:white; padding:8px 16px; border-radius:10px; text-decoration:none; font-size:14px;">⬇️ Download PDF</a>` : ''}
+        <button onclick="shareFromCollection(${i})" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:8px 16px; border-radius:10px; cursor:pointer">🌍 Share to Library</button>
+        <button onclick="deleteCollection(${i})" style="background:#ff6b6b; color:white; padding:8px 16px; border-radius:10px; border:none; cursor:pointer">🗑️ Delete</button>
+      </div>
+      <div id="study-col-${i}" style="display:none; margin-top:16px">
+        <div id="cards-col-${i}"></div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+async function studyCollection(i) {
+  const response = await fetch('/get-collection');
+  const items = await response.json();
+  const item = items[i];
+  const studyDiv = document.getElementById(`study-col-${i}`);
+
+  if (studyDiv.style.display === 'block') {
+    studyDiv.style.display = 'none';
+    return;
+  }
+
+  const container = document.getElementById(`cards-col-${i}`);
+  container.innerHTML = '';
+  studyDiv.style.display = 'block';
+
+  item.cards.forEach(card => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="card-inner" onclick="this.classList.toggle('flipped')">
+        <div class="card-front">❓ ${card.question}</div>
+        <div class="card-back">✅ ${card.answer}</div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+async function deleteCollection(i) {
+  if (!confirm('Delete this from your collection?')) return;
+  await fetch('/delete-collection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ index: i })
+  });
+  alert('Deleted! 🗑️');
+  loadCollection();
+}
+
+async function shareFromCollection(i) {
+  const author = prompt('Enter your name to share:');
+  if (!author) return;
+
+  const response = await fetch('/get-collection');
+  const items = await response.json();
+  const item = items[i];
+
+  await fetch('/share-with-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: item.title,
+      subject: item.subject,
+      author: author,
+      notes: item.notes,
+      cards: item.cards,
+      pdf_filename: item.pdf_filename
+    })
+  });
+  alert('Shared to community library! 🌍');
+}
+
+loadCollection();
+</script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>StudyHive 🐝</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <nav>
+    <a class="logo" href="/">🐝 StudyHive</a>
+    <div class="nav-links">
+      <a href="/" class="active">Home</a>
+      <a href="/todo">📝 To-Do</a>
+      <a href="/library">📚 Library</a>
+      <a href="/collection">📁 Collection</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>🐝 <span class="highlight">StudyHive</span></h1>
+    <p>Paste notes or upload PDF — get AI flashcards instantly!</p>
+  </div>
+
+  <div class="main-card">
+    <div class="pdf-upload" onclick="document.getElementById('pdf-input').click()">
+      📄 Click to upload a PDF — or paste notes below
+      <input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="uploadPDF(this)">
+    </div>
+
+    <textarea id="notes" placeholder="Or paste your study notes here..."></textarea>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center; margin-top:16px;">
+      <button onclick="clearAll()" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:12px 18px; border-radius:50px; font-size:14px; font-weight:600; cursor:pointer; font-family:Inter,sans-serif;">🗑️ Clear</button>
+      <button onclick="generateCards()" style="background:linear-gradient(135deg,#ff6eb4,#a855f7); color:white; border:none; padding:12px 22px; border-radius:50px; font-size:14px; font-weight:700; cursor:pointer; font-family:Inter,sans-serif;">⚡ Flashcards</button>
+      <button onclick="generateQuiz()" style="background:linear-gradient(135deg,#00C9A7,#0096c7); color:white; border:none; padding:12px 22px; border-radius:50px; font-size:14px; font-weight:700; cursor:pointer; font-family:Inter,sans-serif;">📝 Quiz</button>
+      <button onclick="document.getElementById('share-form').style.display='block'" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:12px 18px; border-radius:50px; font-size:14px; font-weight:600; cursor:pointer; font-family:Inter,sans-serif;">🌍 Share</button>
+      <button id="save-btn" onclick="saveToCollection()" style="background:linear-gradient(135deg,#ff6eb4,#a855f7); color:white; border:none; padding:12px 18px; border-radius:50px; font-size:14px; font-weight:600; cursor:pointer; font-family:Inter,sans-serif;">📁 Save to Collection</button>
+      <a href="/library" style="background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2); padding:12px 18px; border-radius:50px; font-size:14px; font-weight:600; cursor:pointer; font-family:Inter,sans-serif; text-decoration:none;">📚 Library</a>
+    </div>
+
+    <div class="share-form" id="share-form">
+      <input id="share-title" placeholder="Note title e.g. Newton's Laws">
+      <input id="share-subject" placeholder="Subject e.g. Physics">
+      <input id="share-author" placeholder="Your name">
+      <button class="btn-teal" onclick="shareNotes()">Share to Community 🌍</button>
+    </div>
+  </div>
+
+  <div id="loading" style="display:none">
+    <div class="spinner"></div>
+    <span>AI is working its magic...</span>
+  </div>
+
+  <div id="cards-container"></div>
+  <div id="quiz-container" style="display:none; margin-top:30px"></div>
+
+</div>
+
+<script>
+async function uploadPDF(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('pdf', file);
+
+  document.getElementById('loading').style.display = 'flex';
+  document.querySelector('#loading span').innerText = '📄 Extracting text from PDF...';
+
+  try {
+    const response = await fetch('/upload-pdf', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (data.text && data.text.trim().length > 0) {
+      document.getElementById('notes').value = data.text;
+      window.currentPdfFilename = data.pdf_filename || '';
+      document.getElementById('loading').style.display = 'none';
+      alert('✅ PDF extracted! Now click Generate Flashcards');
+    } else {
+      document.getElementById('loading').style.display = 'none';
+      alert('⚠️ Could not extract text from this PDF. Try a text-based PDF or paste notes manually.');
+    }
+  } catch (error) {
+    document.getElementById('loading').style.display = 'none';
+    alert('❌ Error reading PDF. Please try again or paste notes manually.');
+  }
+}
+
+async function generateCards() {
+  const notes = document.getElementById('notes').value;
+  if (!notes.trim()) { alert('Please paste some notes first!'); return; }
+
+  document.getElementById('loading').style.display = 'flex';
+  document.querySelector('#loading span').innerText = '🤖 AI is generating your flashcards...';
+  document.getElementById('cards-container').innerHTML = '';
+
+  const response = await fetch('/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ notes })
+  });
+
+  const cards = await response.json();
+  document.getElementById('loading').style.display = 'none';
+
+  cards.forEach(card => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="card-inner" onclick="this.classList.toggle('flipped')">
+        <div class="card-front">❓ ${card.question}</div>
+        <div class="card-back">✅ ${card.answer}</div>
+      </div>`;
+    document.getElementById('cards-container').appendChild(div);
+  });
+
+  window.lastCards = cards;
+}
+
+async function generateQuiz() {
+  const notes = document.getElementById('notes').value;
+  if (!notes.trim()) { alert('Please paste some notes first!'); return; }
+
+  document.getElementById('loading').style.display = 'flex';
+  document.querySelector('#loading span').innerText = '🤖 AI is generating your quiz...';
+  document.getElementById('quiz-container').style.display = 'none';
+
+  const response = await fetch('/quiz', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ notes })
+  });
+
+  const questions = await response.json();
+  document.getElementById('loading').style.display = 'none';
+
+  let html = '<div class="quiz-box">';
+  html += '<h2 style="color:white;margin-bottom:20px">📝 Quiz Time!</h2>';
+  questions.forEach((q, i) => {
+    html += `<div class="quiz-question" id="q${i}">
+      <p><strong>Q${i+1}:</strong> ${q.question}</p>`;
+    q.options.forEach(opt => {
+      html += `<button class="quiz-option" onclick="checkAnswer(this,'${opt[0]}','${q.answer}','q${i}')">${opt}</button>`;
+    });
+    html += `</div>`;
+  });
+  html += `<div id="score-box" style="display:none">
+    <h2 style="color:white">🎉 Your Score: <span id="score"></span></h2>
+  </div></div>`;
+
+  document.getElementById('quiz-container').innerHTML = html;
+  document.getElementById('quiz-container').style.display = 'block';
+}
+
+let totalAnswered = 0;
+let totalScore = 0;
+
+function checkAnswer(btn, selected, correct, qId) {
+  const qDiv = document.getElementById(qId);
+  const buttons = qDiv.querySelectorAll('.quiz-option');
+  buttons.forEach(b => b.disabled = true);
+  if (selected === correct) {
+    btn.style.background = '#00C9A7';
+    btn.style.color = 'white';
+    totalScore++;
+  } else {
+    btn.style.background = '#ff6b6b';
+    btn.style.color = 'white';
+    buttons.forEach(b => {
+      if (b.innerText.startsWith(correct)) {
+        b.style.background = '#00C9A7';
+        b.style.color = 'white';
+      }
+    });
+  }
+  totalAnswered++;
+  if (totalAnswered === document.querySelectorAll('.quiz-question').length) {
+    document.getElementById('score-box').style.display = 'block';
+    document.getElementById('score').textContent = totalScore + ' / ' + totalAnswered;
+  }
+}
+
+function clearAll() {
+  document.getElementById('notes').value = '';
+  document.getElementById('cards-container').innerHTML = '';
+  document.getElementById('quiz-container').innerHTML = '';
+  document.getElementById('quiz-container').style.display = 'none';
+  document.getElementById('share-form').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('pdf-input').value = '';
+  window.lastCards = [];
+  window.currentPdfFilename = '';
+  alert('Cleared! ✅');
+}
+
+async function shareNotes() {
+  const title = document.getElementById('share-title').value;
+  const subject = document.getElementById('share-subject').value;
+  const author = document.getElementById('share-author').value;
+  const notes = document.getElementById('notes').value;
+
+  if (!title || !subject || !author || !notes) {
+    alert('Please fill all fields and generate flashcards first!');
+    return;
+  }
+
+  const cards = [];
+  document.querySelectorAll('.card').forEach(card => {
+    const q = card.querySelector('.card-front').innerText.replace('❓ ', '');
+    const a = card.querySelector('.card-back').innerText.replace('✅ ', '');
+    cards.push({ question: q, answer: a });
+  });
+
+  await fetch('/share', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, subject, author, notes, cards })
+  });
+
+  alert('Notes shared successfully! 🎉');
+  document.getElementById('share-form').style.display = 'none';
+}
+
+async function saveToCollection() {
+  const notes = document.getElementById('notes').value;
+
+  if (!notes.trim()) {
+    alert('Please paste notes first!');
+    return;
+  }
+
+  const cards = window.lastCards || [];
+  const title = prompt('Enter a title:');
+  if (!title) return;
+  const subject = prompt('Enter subject:');
+  if (!subject) return;
+
+  const response = await fetch('/save-collection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: title,
+      subject: subject,
+      notes: notes,
+      cards: cards,
+      pdf_filename: window.currentPdfFilename || ''
+    })
+  });
+
+  const data = await response.json();
+  alert('✅ Saved to your collection!');
+  window.currentPdfFilename = '';
+}
+</script>
+
+</body>
+</html>

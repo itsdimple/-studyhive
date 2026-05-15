@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>StudyHive — To-Do 📝</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+
+  <nav>
+    <a class="logo" href="/">🐝 StudyHive</a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/library">📚 Library</a>
+      <a href="/collection">📁 Collection</a>
+      <a href="/todo" class="active">📝 To-Do</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>📝 <span class="highlight">Study To-Do</span></h1>
+    <p class="subtitle">Stay on top of your study tasks!</p>
+  </div>
+
+  <!-- Add Task Form -->
+  <div class="main-card">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+      <input id="task-input" placeholder="Add a study task e.g. Revise Newton's Laws"
+        style="padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.07); color:white; font-size:14px; outline:none; font-family:Inter,sans-serif;">
+      <input id="task-subject" placeholder="Subject e.g. Physics"
+        style="padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.07); color:white; font-size:14px; outline:none; font-family:Inter,sans-serif;">
+    </div>
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+      <input id="task-date" type="date"
+        style="padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.07); color:white; font-size:14px; outline:none; font-family:Inter,sans-serif;">
+      <select id="task-priority" style="padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:rgba(30,20,50,0.9); color:white; font-size:14px; outline:none; font-family:Inter,sans-serif;">
+        <option value="high">🔴 High Priority</option>
+        <option value="medium" selected>🟡 Medium Priority</option>
+        <option value="low">🟢 Low Priority</option>
+      </select>
+      <button onclick="addTask()" style="background:linear-gradient(135deg,#ff6eb4,#a855f7); color:white; border:none; padding:12px 24px; border-radius:50px; font-size:14px; font-weight:700; cursor:pointer; font-family:Inter,sans-serif;">+ Add Task</button>
+    </div>
+
+    <!-- Filter Buttons -->
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+      <button onclick="filterTasks('all')" id="filter-all" style="background:linear-gradient(135deg,#ff6eb4,#a855f7); color:white; border:none; padding:8px 18px; border-radius:50px; font-size:13px; font-weight:600; cursor:pointer;">All</button>
+      <button onclick="filterTasks('pending')" id="filter-pending" style="background:rgba(255,255,255,0.08); color:white; border:1px solid rgba(255,255,255,0.2); padding:8px 18px; border-radius:50px; font-size:13px; font-weight:600; cursor:pointer;">⏳ Pending</button>
+      <button onclick="filterTasks('completed')" id="filter-completed" style="background:rgba(255,255,255,0.08); color:white; border:1px solid rgba(255,255,255,0.2); padding:8px 18px; border-radius:50px; font-size:13px; font-weight:600; cursor:pointer;">✅ Completed</button>
+      <button onclick="clearCompleted()" style="background:rgba(255,100,100,0.15); color:#ff6b6b; border:1px solid rgba(255,100,100,0.3); padding:8px 18px; border-radius:50px; font-size:13px; font-weight:600; cursor:pointer;">🗑️ Clear Completed</button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px;">
+    <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:16px; text-align:center;">
+      <div id="stat-total" style="font-size:28px; font-weight:700; color:white;">0</div>
+      <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-top:4px;">Total Tasks</div>
+    </div>
+    <div style="background:rgba(255,110,180,0.1); border:1px solid rgba(255,110,180,0.2); border-radius:16px; padding:16px; text-align:center;">
+      <div id="stat-pending" style="font-size:28px; font-weight:700; color:#ff6eb4;">0</div>
+      <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-top:4px;">Pending</div>
+    </div>
+    <div style="background:rgba(0,201,167,0.1); border:1px solid rgba(0,201,167,0.2); border-radius:16px; padding:16px; text-align:center;">
+      <div id="stat-done" style="font-size:28px; font-weight:700; color:#00C9A7;">0</div>
+      <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-top:4px;">Completed</div>
+    </div>
+  </div>
+
+  <!-- Task List -->
+  <div id="task-list"></div>
+
+</div>
+
+<script>
+let tasks = JSON.parse(localStorage.getItem('studyhive-tasks') || '[]');
+let currentFilter = 'all';
+
+function saveTasks() {
+  localStorage.setItem('studyhive-tasks', JSON.stringify(tasks));
+}
+
+function addTask() {
+  const input = document.getElementById('task-input').value.trim();
+  const subject = document.getElementById('task-subject').value.trim();
+  const date = document.getElementById('task-date').value;
+  const priority = document.getElementById('task-priority').value;
+
+  if (!input) { alert('Please enter a task!'); return; }
+
+  tasks.unshift({
+    id: Date.now(),
+    text: input,
+    subject: subject || 'General',
+    date: date || '',
+    priority: priority,
+    done: false,
+    created: new Date().toLocaleDateString('en-IN')
+  });
+
+  saveTasks();
+  renderTasks();
+
+  document.getElementById('task-input').value = '';
+  document.getElementById('task-subject').value = '';
+  document.getElementById('task-date').value = '';
+}
+
+function toggleTask(id) {
+  tasks = tasks.map(t => t.id === id ? {...t, done: !t.done} : t);
+  saveTasks();
+  renderTasks();
+}
+
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  saveTasks();
+  renderTasks();
+}
+
+function clearCompleted() {
+  if (!confirm('Clear all completed tasks?')) return;
+  tasks = tasks.filter(t => !t.done);
+  saveTasks();
+  renderTasks();
+}
+
+function filterTasks(type) {
+  currentFilter = type;
+  document.getElementById('filter-all').style.background = type === 'all' ? 'linear-gradient(135deg,#ff6eb4,#a855f7)' : 'rgba(255,255,255,0.08)';
+  document.getElementById('filter-pending').style.background = type === 'pending' ? 'linear-gradient(135deg,#ff6eb4,#a855f7)' : 'rgba(255,255,255,0.08)';
+  document.getElementById('filter-completed').style.background = type === 'completed' ? 'linear-gradient(135deg,#ff6eb4,#a855f7)' : 'rgba(255,255,255,0.08)';
+  renderTasks();
+}
+
+function priorityColor(p) {
+  if (p === 'high') return '#ff6b6b';
+  if (p === 'medium') return '#FFD700';
+  return '#00C9A7';
+}
+
+function priorityLabel(p) {
+  if (p === 'high') return '🔴 High';
+  if (p === 'medium') return '🟡 Medium';
+  return '🟢 Low';
+}
+
+function isOverdue(date, done) {
+  if (!date || done) return false;
+  return new Date(date) < new Date().setHours(0,0,0,0);
+}
+
+function renderTasks() {
+  let filtered = tasks;
+  if (currentFilter === 'pending') filtered = tasks.filter(t => !t.done);
+  if (currentFilter === 'completed') filtered = tasks.filter(t => t.done);
+
+  const list = document.getElementById('task-list');
+
+  // update stats
+  document.getElementById('stat-total').textContent = tasks.length;
+  document.getElementById('stat-pending').textContent = tasks.filter(t => !t.done).length;
+  document.getElementById('stat-done').textContent = tasks.filter(t => t.done).length;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<p style="color:rgba(255,255,255,0.4); text-align:center; margin-top:20px; font-size:15px;">
+      ${currentFilter === 'completed' ? '🎉 No completed tasks yet!' : '✨ No tasks here! Add one above.'}
+    </p>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  filtered.forEach(task => {
+    const overdue = isOverdue(task.date, task.done);
+    const div = document.createElement('div');
+    div.style.cssText = `background:${task.done ? 'rgba(0,201,167,0.05)' : 'rgba(255,255,255,0.05)'}; border:1px solid ${task.done ? 'rgba(0,201,167,0.2)' : overdue ? 'rgba(255,100,100,0.3)' : 'rgba(255,255,255,0.1)'}; border-radius:16px; padding:16px 20px; margin-bottom:12px; display:flex; align-items:center; gap:14px; transition:all 0.2s;`;
+    div.innerHTML = `
+      <div onclick="toggleTask(${task.id})" style="width:22px; height:22px; border-radius:50%; border:2px solid ${task.done ? '#00C9A7' : 'rgba(255,255,255,0.3)'}; background:${task.done ? '#00C9A7' : 'transparent'}; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:12px;">
+        ${task.done ? '✓' : ''}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:15px; font-weight:500; color:${task.done ? 'rgba(255,255,255,0.4)' : 'white'}; text-decoration:${task.done ? 'line-through' : 'none'}; margin-bottom:4px;">${task.text}</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <span style="background:linear-gradient(135deg,#ff6eb4,#a855f7); color:white; padding:2px 10px; border-radius:99px; font-size:11px; font-weight:500;">${task.subject}</span>
+          <span style="color:${priorityColor(task.priority)}; font-size:12px;">${priorityLabel(task.priority)}</span>
+          ${task.date ? `<span style="font-size:12px; color:${overdue ? '#ff6b6b' : 'rgba(255,255,255,0.4)'};">${overdue ? '⚠️ Overdue: ' : '📅 '}${new Date(task.date).toLocaleDateString('en-IN')}</span>` : ''}
+          <span style="font-size:11px; color:rgba(255,255,255,0.3);">Added ${task.created}</span>
+        </div>
+      </div>
+      <button onclick="deleteTask(${task.id})" style="background:rgba(255,100,100,0.15); color:#ff6b6b; border:none; padding:6px 12px; border-radius:10px; cursor:pointer; font-size:13px;">🗑️</button>`;
+    list.appendChild(div);
+  });
+}
+
+// Add task on Enter key
+document.getElementById('task-input').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') addTask();
+});
+
+renderTasks();
+</script>
+</body>
+</html>
