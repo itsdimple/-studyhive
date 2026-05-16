@@ -135,6 +135,7 @@ def view_note(index):
 
 COLLECTION_FILE = "collection.json"
 UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def load_collection():
     if not os.path.exists(COLLECTION_FILE):
